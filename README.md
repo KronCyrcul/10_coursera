@@ -2,7 +2,7 @@
 
 The script goes throught pages on ```https://www.coursera.org/courses``` while don't find more or equal to 20 courses. Than takes information from every course page such as name, start date, course language, etc and save it in an excel file ```courses.xlsx```
 
-#Usage Example
+# Usage Example
 
 Python 3 should be already installed. Example of script launch on Linux, Python 3.5:
 ```
