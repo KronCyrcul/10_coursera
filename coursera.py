@@ -5,7 +5,7 @@ import os
 import re
 
 
-def get_courses_list(url, courses_count, page_start, courses_links=[]):
+def get_courses_list(url, courses_count, page_start, courses_links):
     params = {"start": page_start}
     response = requests.get(url)
     response_soup = BeautifulSoup(response.text, "html.parser")
@@ -31,13 +31,13 @@ def get_courses_info(url, course_link):
     tbody = course_soup.find_all("tbody")[0]
     for tbody["tr"] in tbody:
         row_data = tbody["tr"].find_all("td")
-        info = row_data[0].text
-        if info == "User Ratings":
-            course_info[info] = row_data[1].find(
+        info_title = row_data[0].text
+        if info_title == "User Ratings":
+            course_info[info_title] = row_data[1].find(
                 "div",
                 {"class": "ratings-text"}).text
         else:
-            course_info[info] = row_data[1].text
+            course_info[info_title] = row_data[1].text
     return course_info
 
 
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     courses_url = "{}/{}".format(url, "courses")
     courses_count = 20
     page_start = 0
-    courses_links = get_courses_list(courses_url, courses_count, page_start)
+    courses_links = get_courses_list(courses_url, courses_count, page_start, list())
     courses_info = []
     for course in courses_links:
         courses_info.append(get_courses_info(url, course))
