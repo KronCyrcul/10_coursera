@@ -1,89 +1,77 @@
 from bs4 import BeautifulSoup
 from openpyxl import Workbook
+from lxml import etree
 import requests
 import os
 import re
 
 
-def get_courses_list(url, courses_count, page_search, courses_links):
-    params = {"start": page_search}
-    response = requests.get(url)
-    response_soup = BeautifulSoup(response.text, "html.parser")
-    research_result = response_soup.find_all(
-        "div",
-        {"data-courselenium": "catalog_search_result"})
-    courses_links += [link["href"] for link in research_result[0].find_all(
-        "a", href=re.compile(r"/learn/"))]
-    if len(courses_links) <= courses_count:
-        page_search += 20
-        get_courses_list(url, courses_count, page_start, courses_links)
-    return courses_links
+def encode_string(string):
+    return string.encode("raw_unicode_escape").decode("utf-8")
 
 
-def get_courses_info(url, course_link):
+def get_courses_list(response, courses_count):
+    courses_list = []
+    xml_root = etree.XML(response.text.encode('utf-8'))
+    xml_locs = xml_root.findall(
+        ".//{http://www.sitemaps.org/schemas/sitemap/0.9}loc")
+    for course in xml_locs[:courses_count]:
+        courses_list.append(course.text)
+    return courses_list
+
+
+def get_course_info(course_response):
     course_info = {}
-    course_url = "{}{}".format(url, course_link)
-    response = requests.get(course_url)
-    course_soup = BeautifulSoup(response.text, "html.parser")
-    course_info["Name"] = course_soup.find("h1", {"class": "title"}).text
-    course_info["Start date"] = course_soup.find("div", "startdate").text
-    tbody = course_soup.find_all("tbody")[0]
-    for tbody["tr"] in tbody:
-        row_data = tbody["tr"].find_all("td")
+    course_soup = BeautifulSoup(course_response.text, "html.parser")
+    course_name = course_soup.find("h1", {"class": "title"}).text
+    course_info["Name"] = encode_string(course_name)
+    course_info["Start date"] = encode_string(
+        course_soup.find("div", "startdate").text)
+    tbody = course_soup.find("tbody")
+    table_rows = tbody.find_all("tr")
+    for row in table_rows:
+        row_data = row.find_all("td")
         info_title = row_data[0].text
         if info_title == "User Ratings":
             course_info[info_title] = row_data[1].find(
                 "div",
                 {"class": "ratings-text"}).text
         else:
-            course_info[info_title] = row_data[1].text
+            course_info[info_title] = encode_string(row_data[1].text)
     return course_info
 
 
-def output_courses_info_to_xlsx(workbook, course_info, course_row):
-    for key, value in course_info.items():
-        try:
-            first_row = worksheet.rows[0]
-            first_row_values = [cell.value for cell in first_row]
-            worksheet.cell(
-                row=course_row,
-                column=first_row_values.index(key)+1).value = value
-        except IndexError:
-            worksheet.append(list(course_info.keys()))
-            first_row = worksheet.rows[0]
-            first_row_values = [cell.value for cell in first_row]
-            worksheet.cell(
-                row=course_row,
-                column=first_row_values.index(key)+1).value = value
-        except ValueError:
+def output_courses_info_to_xlsx(worksheet, course_info):
+    course_row = []
+    try:
+        first_row = worksheet.rows[0]
+    except IndexError:
+        worksheet.append(list(course_info.keys()))
+        first_row = worksheet.rows[0]
+    first_row_values = [cell.value for cell in first_row]
+    for key in course_info.keys():
+        if key not in first_row_values:
             worksheet.cell(
                 row=1,
                 column=len(first_row_values)+1).value = key
-            worksheet.cell(
-                row=course_row,
-                column=len(first_row_values)+1).value = value
-    return workbook
+    for title in first_row_values:
+        course_row += [course_info[title] if title in list(course_info.keys())
+            else None]
+    worksheet.append(course_row)
+    return worksheet
 
 
 if __name__ == "__main__":
     filepath = os.getcwd()
-    url = "https://www.coursera.org"
-    courses_url = "{}/{}".format(url, "courses")
+    url = "https://www.coursera.org/sitemap~www~courses.xml"
     courses_count = 20
-    page_start = 0
-    courses_links = get_courses_list(
-        courses_url,
-        courses_count,
-        page_start,
-        list())
     workbook = Workbook()
     worksheet = workbook.active
-    course_row = 2
-    for course in courses_links:
-        course_info = get_courses_info(url, course)
-        workbook = output_courses_info_to_xlsx(
-            workbook,
-            course_info,
-            course_row)
-        course_row += 1
+    courses_url = "{}/{}".format(url)
+    response = requests.get(courses_url)
+    courses_list = get_courses_list(response, courses_count)
+    for course in courses_list:
+        course_response = requests.get(course)
+        course_info = get_course_info(course_response)
+        output_courses_info_to_xlsx(worksheet, course_info)
     workbook.save("{}/{}".format(filepath, "courses.xlsx"))
