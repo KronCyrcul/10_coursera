@@ -6,13 +6,9 @@ import os
 import re
 
 
-def encode_string(string):
-    return string.encode("raw_unicode_escape").decode("utf-8")
-
-
-def get_courses_list(response, courses_count):
+def get_courses_links(response_content, courses_count):
     courses_list = []
-    xml_root = etree.XML(response.text.encode('utf-8'))
+    xml_root = etree.XML(response_content)
     xml_locs = xml_root.findall(
         ".//{http://www.sitemaps.org/schemas/sitemap/0.9}loc")
     for course in xml_locs[:courses_count]:
@@ -22,42 +18,33 @@ def get_courses_list(response, courses_count):
 
 def get_course_info(course_response):
     course_info = {}
-    course_soup = BeautifulSoup(course_response.text, "html.parser")
-    course_name = course_soup.find("h1", {"class": "title"}).text
-    course_info["Name"] = encode_string(course_name)
-    course_info["Start date"] = encode_string(
-        course_soup.find("div", "startdate").text)
-    tbody = course_soup.find("tbody")
-    table_rows = tbody.find_all("tr")
-    for row in table_rows:
-        row_data = row.find_all("td")
-        info_title = row_data[0].text
-        if info_title == "User Ratings":
-            course_info[info_title] = row_data[1].find(
-                "div",
-                {"class": "ratings-text"}).text
-        else:
-            course_info[info_title] = encode_string(row_data[1].text)
+    course_soup = BeautifulSoup(course_response, "html.parser")
+    course_info["Name"] = course_soup.find("h1", {"class": "title"}).text
+    course_info["Start date"] = course_soup.find("div", "startdate").text
+    tbody = course_soup.find("table", {"class": "basic-info-table"})
+    table_tds = tbody.find_all("td")
+    table_titles = [title.text for title in table_tds[::2]]
+    table_datas = [data.text for data in table_tds[1::2]]
+    course_info.update(dict(zip(table_titles, table_datas)))
+    if "User Ratings" in table_titles:
+        course_info["User Ratings"] = course_soup.find(
+            "div",
+            {"class": "ratings-text"}).text
     return course_info
 
 
-def output_courses_info_to_xlsx(worksheet, course_info):
-    course_row = []
-    try:
-        first_row = worksheet.rows[0]
-    except IndexError:
-        worksheet.append(list(course_info.keys()))
-        first_row = worksheet.rows[0]
-    first_row_values = [cell.value for cell in first_row]
-    for key in course_info.keys():
-        if key not in first_row_values:
-            worksheet.cell(
-                row=1,
-                column=len(first_row_values)+1).value = key
-    for title in first_row_values:
-        course_row += [course_info[title] if title in list(course_info.keys())
-            else None]
-    worksheet.append(course_row)
+def output_courses_info_to_xlsx(worksheet, all_courses_info):
+    first_row = []
+    for course in all_courses_info:
+        first_row += [key for key in course.keys() if key not in first_row]
+    worksheet.append(first_row)
+    for course in all_courses_info:
+        course_row = []
+        course_keys = list(course.keys())
+        missing_keys = [key for key in first_row if key not in course_keys]
+        course.update(dict([(key, None) for key in missing_keys]))
+        course_row = [course[title] for title in first_row]
+        worksheet.append(course_row)
     return worksheet
 
 
@@ -67,11 +54,12 @@ if __name__ == "__main__":
     courses_count = 20
     workbook = Workbook()
     worksheet = workbook.active
-    courses_url = "{}/{}".format(url)
-    response = requests.get(courses_url)
-    courses_list = get_courses_list(response, courses_count)
+    response = requests.get(url)
+    courses_list = get_courses_links(response.content, courses_count)
+    all_courses_info = []
     for course in courses_list:
         course_response = requests.get(course)
-        course_info = get_course_info(course_response)
-        output_courses_info_to_xlsx(worksheet, course_info)
+        course_response.encoding = "utf-8"
+        all_courses_info.append(get_course_info(course_response.text))
+    output_courses_info_to_xlsx(worksheet, all_courses_info)
     workbook.save("{}/{}".format(filepath, "courses.xlsx"))
