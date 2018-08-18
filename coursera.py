@@ -24,7 +24,7 @@ def get_course_info(course_response):
     tbody = course_soup.find("table", {"class": "basic-info-table"})
     table_tds = tbody.find_all("td")
     table_titles = [title.text for title in table_tds[::2]]
-    table_datas = [data.text for data in table_tds[1::2]]
+    table_datas = [table_data.text for table_data in table_tds[1::2]]
     course_info.update(dict(zip(table_titles, table_datas)))
     if "User Ratings" in table_titles:
         course_info["User Ratings"] = course_soup.find(
