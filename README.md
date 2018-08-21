@@ -8,7 +8,7 @@ Python 3 should be already installed. Example of script launch on Linux, Python 
 ```
 $ python coursera.py <filename>
 ```
-# <filename>.xlsx example
+# < filename >.xlsx example
 
 | Name | Start Date | User Ratings |
 | ---- | --- | --- |
