@@ -3,7 +3,6 @@ from openpyxl import Workbook
 from lxml import etree
 import requests
 import os
-import re
 
 
 def get_courses_links(response_content, courses_count):
