@@ -16,9 +16,9 @@ def get_courses_links(xml, courses_count):
     return courses_list
 
 
-def get_course_info(course_response, main_course_keys):
+def get_course_info(html_feed, main_course_keys):
     course_info = dict.fromkeys(main_course_keys)
-    course_soup = BeautifulSoup(course_response, "html.parser")
+    course_soup = BeautifulSoup(html_feed, "html.parser")
     course_info["Name"] = course_soup.find("h1", {"class": "title"}).text
     course_info["Start date"] = course_soup.find("div", "startdate").text
     tbody = course_soup.find("table", {"class": "basic-info-table"})
@@ -59,9 +59,9 @@ if __name__ == "__main__":
                         "Language", "User Ratings", "Commitment"]
     all_courses_info = []
     for course in courses_list:
-        course_response = requests.get(course)
-        course_response.encoding = "utf-8"
+        html_feed = requests.get(course)
+        html_feed.encoding = "utf-8"
         all_courses_info.append(
-            get_course_info(course_response.text, main_course_keys))
+            get_course_info(html_feed.text, main_course_keys))
     output_courses_info_to_xlsx(worksheet, all_courses_info, main_course_keys)
     workbook.save(os.path.join(filepath, file_name))
