@@ -8,7 +8,7 @@ import os
 
 def get_courses_links(xml, courses_count):
     courses_list = []
-    xml_root = etree.XML(response_xml)
+    xml_root = etree.XML(xml)
     xml_locs = xml_root.findall(
         ".//{http://www.sitemaps.org/schemas/sitemap/0.9}loc")
     for course in xml_locs[:courses_count]:
@@ -64,4 +64,4 @@ if __name__ == "__main__":
         all_courses_info.append(
             get_course_info(html_feed.text, main_course_keys))
     output_courses_info_to_xlsx(worksheet, all_courses_info, main_course_keys)
-    workbook.save(os.path.join(filepath, file_name))
+    workbook.save(os.path.join(filepath, ".".join((file_name,"xlsx"))))
